@@ -4,4 +4,13 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "chromadb>=0.6.3",
+    "cohere>=5.13.12",
+    "google-genai>=1.3.0",
+    "langchain-community>=0.3.18",
+    "pymupdf>=1.25.3",
+    "rank-bm25>=0.2.2",
+    "sentence-transformers>=3.4.1",
+    "tqdm>=4.67.1",
+]
