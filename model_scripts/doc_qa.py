@@ -1,15 +1,24 @@
 import cohere
 import yaml
-from prompts import preamble, tool_description, user_message
+from prompts import (
+    preamble,
+    tool_description,
+    user_message,
+    gemini_prompt,
+    gemini_retrieved_prompt,
+)
 from db import DocumentDatabase
 from jinja2 import Template
 import json
-from model_scripts.pdf_utils import full_text_parse
+from pdf_utils import full_text_parse
 from dotenv import load_dotenv
 import os
+from google import genai
+from google.genai import types
+from pathlib import Path
 
 
-class LLM:
+class CohereLLM:
     """Handles LLM interactions for Q&A over retrieved documents"""
 
     def __init__(self, api_key, database, config_path="llm_config.yaml"):
@@ -111,6 +120,84 @@ class LLM:
         return response.message.content[0].text
 
 
+class GeminiLLM:
+    """Handles LLM interactions for Q&A over retrieved documents"""
+
+    def __init__(self, api_key, database, config_path="llm_config.yaml"):
+        # Initialize LLM client
+        self.llm = genai.Client(api_key=api_key)
+        self.db = database
+        # Load configuration
+        with open(config_path, "r") as config_file:
+            self.config = yaml.safe_load(config_file)
+
+        self.model = self.config.get("model", "gemini-2.0-flash")
+        self.temperature = self.config.get("temperature", 0.1)
+        self.tool = types.Tool(
+            function_declarations=[
+                types.FunctionDeclaration(
+                    name="query",
+                    description="Returns a list of relevant documents from a vector database",
+                    parameters=types.Schema(
+                        properties={
+                            "query": types.Schema(type="STRING"),
+                        },
+                        type="OBJECT",
+                    ),
+                )
+            ]
+        )
+        self.model_config = {
+            "tools": [self.tool],
+            "automatic_function_calling": {"disable": True},
+        }
+
+    def _handle_tool_call(self, response):
+        print(response)
+        query = response[0].args["query"]
+        tool_result = self.db.vector_search(query)
+        return tool_result
+
+    def generate_answer(self, question, document, temperature=None):
+        """Generate answer using retrieved documents"""
+        if temperature is None:
+            temperature = self.temperature
+        prompt_template = Template(gemini_prompt)
+        user_input = prompt_template.render(user_query=question)
+        file_path = Path(document)
+        # Generate response
+        response = self.llm.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=[
+                types.Part.from_bytes(
+                    data=file_path.read_bytes(),
+                    mime_type="application/pdf",
+                ),
+                user_input,
+            ],
+            config=self.model_config,
+        )
+        if response.function_calls:
+            retrieved_docs = self._handle_tool_call(response.function_calls)
+            retrieval_template = Template(gemini_retrieved_prompt)
+            user_input = retrieval_template.render(
+                user_query=question, documents=retrieved_docs["documents"][0]
+            )
+            response = self.llm.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=[
+                    types.Part.from_bytes(
+                        data=file_path.read_bytes(),
+                        mime_type="application/pdf",
+                    ),
+                    user_input,
+                ],
+                config=self.model_config,
+            )
+
+        return response
+
+
 # Example usage
 if __name__ == "__main__":
     load_dotenv()
@@ -118,9 +205,11 @@ if __name__ == "__main__":
     cohere_api_key = os.getenv("COHERE_API")
     gemini_api_key = os.getenv("GOOGLE_API")
     database = DocumentDatabase(gemini_api=gemini_api_key)
-    document = full_text_parse("../data/2408.02545v1.pdf")
+    doc_path = "../data/2408.02545v1.pdf"
+    document = full_text_parse(doc_path)
     query = "How could this research be combined with other research to enhance multi-agent systems?"
     # Initialize QA system
-    model = LLM(cohere_api_key, database)
-    model_response = model.generate_answer(query, document)
-    print(model_response)
+    # model = CohereLLM(cohere_api_key, database)
+    model = GeminiLLM(gemini_api_key, database)
+    model_response = model.generate_answer(query, doc_path)
+    print(model_response.text)

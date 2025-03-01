@@ -1,7 +1,7 @@
 import chromadb
 from chromadb.utils import embedding_functions
 from rank_bm25 import BM25Okapi
-from model_scripts.pdf_utils import summary_extraction
+from pdf_utils import summary_extraction
 import os
 import re
 from tqdm import tqdm
@@ -77,7 +77,25 @@ class DocumentDatabase:
         return text.split()
 
     def vector_search(self, query, n_results=5):
-        """Semantic search using vector embeddings"""
+        """
+        Perform a semantic search on the document collection using vector embeddings.
+
+        This function leverages vector embeddings to find documents that are semantically
+        similar to the input query. It queries the collection of documents stored in the
+        chroma database and retrieves the top N results that best match the semantic content of
+        the query. The search is based on the vector representation of the documents and
+        the query, allowing for a more nuanced understanding of the content beyond simple
+        keyword matching.
+
+        Parameters:
+        - query (str): The natural language query for which the search is to be performed.
+        - n_results (int, optional): The number of top matching documents to retrieve.
+          Defaults to 5.
+
+        Returns:
+        - results (dict): A dictionary containing the search results, which includes the
+          documents, their metadata, and associated IDs that are most relevant to the query.
+        """
         results = self.collection.query(
             query_texts=[query], n_results=n_results
         )
@@ -120,6 +138,7 @@ class DocumentDatabase:
         }
 
     def hybrid_search(self, query, field="abstract", n_results=5):
+        # ! ToDo update hybrid search method to do something other than just create a set
         """Combined semantic and keyword search"""
         vector_results = self.vector_search(query, n_results)
         keyword_results = self.keyword_search(query, field, n_results)
