@@ -7,6 +7,9 @@ Examples of scenarios where this tool would be useful include:
 2.) Verfiying that the research/methods detailed in the paper are up to date or state of the art
 3.) Synthesizing the information in the paper with papers on related topics to do a more in depth analysis
 
+Whenever outside sources are retrieved, first consider their relevance to the user's query and provided document. Only include relevant sources in your analysis.
+Always relate your analysis to the main document being analyzed. When using outside sources for your analysis, explain how their content relates to the user's query.
+
 ## Style Guide
 Unless the user asks for a different style of answer, you should answer in full sentences, using proper grammar and spelling.
 """
@@ -42,3 +45,5 @@ user_message = """
 {{user_query}}
 </user_query>
 """
+abstract_prompt = "The provided PDF is a scientific article. Your task is to extract the title and abstract from this article into JSON format. If the article is grey literature and doesn't have an abstract, extract the next best thing, such as an executive summary or introduction, into the abstract field"
+summary_prompt = "The provided PDF is a scientific article. Your task is to extract the title and a one paragraph summary of this article into JSON format.This summary should detail the key research and findings of the article, while remaining concise and to the point"
