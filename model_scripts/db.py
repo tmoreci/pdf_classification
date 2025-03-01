@@ -1,10 +1,11 @@
 import chromadb
 from chromadb.utils import embedding_functions
 from rank_bm25 import BM25Okapi
-from preprocess_pdfs import gemini_extraction
+from preprocess_pdfs import summary_extraction
 import os
 import re
 from tqdm import tqdm
+from google import genai
 
 
 class DocumentDatabase:
@@ -12,10 +13,12 @@ class DocumentDatabase:
 
     def __init__(
         self,
+        gemini_api,
         db_path="../data/chroma_db",
         collection_name="academic_papers",
         model_name="all-MiniLM-L6-v2",
     ):
+        # ! Todo test out different embedding models
         # Initialize embedding function
         self.embedding_function = (
             embedding_functions.SentenceTransformerEmbeddingFunction(
@@ -24,26 +27,27 @@ class DocumentDatabase:
         )
 
         # Initialize ChromaDB
-        self.client = chromadb.PersistentClient(path=db_path)
+        self.db_client = chromadb.PersistentClient(path=db_path)
 
         # Create or get collection
-        self.collection = self.client.get_or_create_collection(
+        self.collection = self.db_client.get_or_create_collection(
             name=collection_name, embedding_function=self.embedding_function
         )
+        self.gemini_client = genai.Client(api_key=gemini_api)
 
     def add_document(self, file_path, doc_id):
         """Process and add a document to the database with metadata"""
         # Extract abstract
-        llm_extraction = gemini_extraction(file_path)
+        llm_extraction = summary_extraction(file_path, self.gemini_client)
 
         self.collection.add(
             ids=[f"{doc_id}"],
-            documents=[llm_extraction.abstract],
+            documents=[llm_extraction.summary],
             metadatas=[
                 {
                     "doc_id": doc_id,
                     "title": llm_extraction.title,
-                    "abstract": llm_extraction.abstract,
+                    # "abstract": llm_extraction.abstract,
                 }
             ],
         )
