@@ -4,7 +4,7 @@ from prompts import preamble, tool_description, user_message
 from db import DocumentDatabase
 from jinja2 import Template
 import json
-from preprocess_pdfs import full_text_parse
+from model_scripts.pdf_utils import full_text_parse
 from dotenv import load_dotenv
 import os
 

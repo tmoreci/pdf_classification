@@ -1,7 +1,7 @@
 import chromadb
 from chromadb.utils import embedding_functions
 from rank_bm25 import BM25Okapi
-from preprocess_pdfs import summary_extraction
+from model_scripts.pdf_utils import summary_extraction
 import os
 import re
 from tqdm import tqdm
