@@ -70,11 +70,17 @@ gemini_retrieved_prompt = """
 You have been provided a PDF of an academic research paper. You will now be provided with a user query about the paper and a set of small summaries of additional research papers that are relevant to the user's query.
 Answer the user's query to the best of your ability, citing relevant retrieved documents when necessary. There is a chance some of the retrieved documents are not relevant to the query. Only include information from relevant documents in your analysis
 
+## Output Instructions
+When referencing content from the retrieved documents, use the following citation format:
+Add [i] at the end of the relevant sentence, Where i is the number of the relevant document
+
 ### User Query
 {{user_query}}
 
 ### Retrieved Documents
-{% for document in documents %}
+{% for i, document in enumerate(documents) %}
+doc_{{ i }}
 {{ document }}
+
 {% endfor %}
 """

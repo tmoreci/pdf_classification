@@ -152,6 +152,28 @@ class GeminiLLM:
             "automatic_function_calling": {"disable": True},
         }
 
+    def _extract_citations(self, llm_response):
+        """
+        Extracts document citations from an LLM response that uses [i] citation format.
+
+        Args:
+            llm_response (str): The text response from the LLM with citations in [i] format.
+
+        Returns:
+            list: A list of unique document indices that were cited in the response.
+        """
+        import re
+
+        # Find all citations in the format [i]
+        citation_pattern = r"\[(\d+)\]"
+        citations = re.findall(citation_pattern, llm_response)
+
+        # Convert to integers and get unique citations
+        cited_doc_indices = [int(idx) for idx in citations]
+        unique_cited_docs = sorted(set(cited_doc_indices))
+
+        return unique_cited_docs
+
     def _handle_tool_call(self, response):
         print(response)
         query = response[0].args["query"]
@@ -180,8 +202,11 @@ class GeminiLLM:
         if response.function_calls:
             retrieved_docs = self._handle_tool_call(response.function_calls)
             retrieval_template = Template(gemini_retrieved_prompt)
+            # ! To Do: Add titles to prompt
             user_input = retrieval_template.render(
-                user_query=question, documents=retrieved_docs["documents"][0]
+                user_query=question,
+                documents=retrieved_docs["documents"][0],
+                enumerate=enumerate,
             )
             response = self.llm.models.generate_content(
                 model="gemini-2.0-flash",
@@ -194,8 +219,9 @@ class GeminiLLM:
                 ],
                 config=self.model_config,
             )
+            cited_docs = self._extract_citations(response.text)
 
-        return response
+        return response, cited_docs, retrieved_docs
 
 
 # Example usage
@@ -211,5 +237,7 @@ if __name__ == "__main__":
     # Initialize QA system
     # model = CohereLLM(cohere_api_key, database)
     model = GeminiLLM(gemini_api_key, database)
-    model_response = model.generate_answer(query, doc_path)
+    model_response, cited_docs, retrieved_docs = model.generate_answer(
+        query, doc_path
+    )
     print(model_response.text)
