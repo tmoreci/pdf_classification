@@ -8,19 +8,9 @@ from chromadb.utils import embedding_functions
 from pathlib import Path
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from pydantic import BaseModel
 from dotenv import load_dotenv
 from prompts import summary_prompt, abstract_prompt
-
-
-class Extraction(BaseModel):
-    title: str
-    abstract: str
-
-
-class Summary(BaseModel):
-    title: str
-    summary: str
+from base import Extraction, Summary
 
 
 def full_text_parse(file_path):

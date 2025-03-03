@@ -16,9 +16,10 @@ import os
 from google import genai
 from google.genai import types
 from pathlib import Path
+from base import LLM
 
 
-class CohereLLM:
+class CohereLLM(LLM):
     """Handles LLM interactions for Q&A over retrieved documents"""
 
     def __init__(self, api_key, database, config_path="llm_config.yaml"):
@@ -120,10 +121,10 @@ class CohereLLM:
         return response.message.content[0].text
 
 
-class GeminiLLM:
+class GeminiLLM(LLM):
     """Handles LLM interactions for Q&A over retrieved documents"""
 
-    def __init__(self, api_key, database, config_path="llm_config.yaml"):
+    def __init__(self, api_key, database, config_path="../llm_config.yaml"):
         # Initialize LLM client
         self.llm = genai.Client(api_key=api_key)
         self.db = database
@@ -187,6 +188,8 @@ class GeminiLLM:
         prompt_template = Template(gemini_prompt)
         user_input = prompt_template.render(user_query=question)
         file_path = Path(document)
+        cited_docs = []
+        retrieved_docs = []
         # Generate response
         response = self.llm.models.generate_content(
             model="gemini-2.0-flash",
