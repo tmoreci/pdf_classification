@@ -13,6 +13,7 @@ import json
 from pdf_utils import full_text_parse
 from dotenv import load_dotenv
 import os
+import re
 from google import genai
 from google.genai import types
 from pathlib import Path
@@ -22,16 +23,12 @@ from base import LLM
 class CohereLLM(LLM):
     """Handles LLM interactions for Q&A over retrieved documents"""
 
-    def __init__(self, api_key, database, config_path="llm_config.yaml"):
+    def __init__(self, api_key, database, model, temperature):
         # Initialize LLM client
         self.llm = cohere.ClientV2(api_key)
         self.db = database
-        # Load configuration
-        with open(config_path, "r") as config_file:
-            self.config = yaml.safe_load(config_file)
-
-        self.model = self.config.get("model", "command-r-08-2024")
-        self.temperature = self.config.get("temperature", 0.1)
+        self.model = self.model
+        self.temperature = self.temperature
         self.tools = [
             cohere.ToolV2(
                 type="function",
@@ -124,16 +121,12 @@ class CohereLLM(LLM):
 class GeminiLLM(LLM):
     """Handles LLM interactions for Q&A over retrieved documents"""
 
-    def __init__(self, api_key, database, config_path="../llm_config.yaml"):
+    def __init__(self, api_key, database, model, temperature):
         # Initialize LLM client
         self.llm = genai.Client(api_key=api_key)
         self.db = database
-        # Load configuration
-        with open(config_path, "r") as config_file:
-            self.config = yaml.safe_load(config_file)
-
-        self.model = self.config.get("model", "gemini-2.0-flash")
-        self.temperature = self.config.get("temperature", 0.1)
+        self.model = model
+        self.temperature = temperature
         self.tool = types.Tool(
             function_declarations=[
                 types.FunctionDeclaration(
@@ -163,7 +156,6 @@ class GeminiLLM(LLM):
         Returns:
             list: A list of unique document indices that were cited in the response.
         """
-        import re
 
         # Find all citations in the format [i]
         citation_pattern = r"\[(\d+)\]"
@@ -235,11 +227,13 @@ if __name__ == "__main__":
     gemini_api_key = os.getenv("GOOGLE_API")
     database = DocumentDatabase(gemini_api=gemini_api_key)
     doc_path = "../data/2408.02545v1.pdf"
+    model = "gemini-2.0-flash"
+    temperature = 0.1
     document = full_text_parse(doc_path)
     query = "How could this research be combined with other research to enhance multi-agent systems?"
     # Initialize QA system
     # model = CohereLLM(cohere_api_key, database)
-    model = GeminiLLM(gemini_api_key, database)
+    model = GeminiLLM(gemini_api_key, database, model, temperature)
     model_response, cited_docs, retrieved_docs = model.generate_answer(
         query, doc_path
     )
