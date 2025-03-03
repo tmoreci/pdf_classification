@@ -137,38 +137,101 @@ class DocumentDatabase:
             "ids": [[all_docs["ids"][i]] for i in original_indices],
         }
 
-    def hybrid_search(self, query, field="abstract", n_results=5):
-        # ! ToDo update hybrid search method to do something other than just create a set
-        """Combined semantic and keyword search"""
-        vector_results = self.vector_search(query, n_results)
-        keyword_results = self.keyword_search(query, field, n_results)
+    def hybrid_search(
+        self,
+        query,
+        field="abstract",
+        n_results=5,
+        semantic_weight=0.8,
+        keyword_weight=0.2,
+    ):
+        """
+        Enhanced hybrid search combining vector and keyword search with weighted rankings.
+        Based on Anthropic contextual document embeddings implementation
 
-        # Combine and deduplicate results
-        combined_docs = []
-        combined_metadata = []
-        seen_ids = set()
+        Parameters:
+        - query (str): The search query
+        - field (str): Field to search in for keyword search
+        - n_results (int): Number of results to return
+        - semantic_weight (float): Weight for semantic search results (0-1)
+        - keyword_weight (float): Weight for keyword search results (0-1)
 
-        # Helper function to process results from either search
-        def process_results(results):
-            for i, doc_list in enumerate(results["documents"]):
-                for j, doc in enumerate(doc_list):
-                    doc_id = results["ids"][i][j]
-                    if doc_id not in seen_ids:
-                        combined_docs.append(doc)
-                        combined_metadata.append(results["metadatas"][i][j])
-                        seen_ids.add(doc_id)
+        Returns:
+        - dict: Combined search results with ranking information
+        """
+        # Use a larger initial recall size for better reranking
+        initial_recall = max(n_results * 5, 50)
 
-        # Process both result sets
-        process_results(vector_results)
-        process_results(keyword_results)
+        # Get results from both methods
+        vector_results = self.vector_search(query, initial_recall)
+        keyword_results = self.keyword_search(query, field, initial_recall)
 
-        # Limit to n_results
-        combined_docs = combined_docs[:n_results]
-        combined_metadata = combined_metadata[:n_results]
+        # Track and score all retrieved document IDs
+        doc_scores = {}
+
+        # Process vector search results
+        for i, doc_list in enumerate(vector_results["documents"]):
+            for j, doc in enumerate(doc_list):
+                doc_id = vector_results["ids"][i][j]
+                # Use reciprocal rank for scoring
+                score = semantic_weight * (1.0 / (j + 1))
+                doc_scores[doc_id] = {
+                    "score": score,
+                    "document": doc,
+                    "metadata": vector_results["metadatas"][i][j],
+                    "from_vector": True,
+                    "from_keyword": False,
+                }
+
+        # Process keyword search results
+        for i, doc_list in enumerate(keyword_results["documents"]):
+            for j, doc in enumerate(doc_list):
+                doc_id = keyword_results["ids"][i][j]
+                # Use reciprocal rank for scoring
+                keyword_score = keyword_weight * (1.0 / (j + 1))
+
+                if doc_id in doc_scores:
+                    # Document already found in vector search
+                    doc_scores[doc_id]["score"] += keyword_score
+                    doc_scores[doc_id]["from_keyword"] = True
+                else:
+                    # New document from keyword search
+                    doc_scores[doc_id] = {
+                        "score": keyword_score,
+                        "document": doc,
+                        "metadata": keyword_results["metadatas"][i][j],
+                        "from_vector": False,
+                        "from_keyword": True,
+                    }
+
+        # Sort by score in descending order
+        sorted_results = sorted(
+            doc_scores.items(), key=lambda x: x[1]["score"], reverse=True
+        )[:n_results]
 
         # Format results
+        documents = []
+        metadatas = []
+        ids = []
+        origins = {"vector_only": 0, "keyword_only": 0, "both": 0}
+
+        for doc_id, info in sorted_results:
+            documents.append(info["document"])
+            metadatas.append(info["metadata"])
+            ids.append(doc_id)
+
+            # Track result origins for analytics
+            if info["from_vector"] and info["from_keyword"]:
+                origins["both"] += 1
+            elif info["from_vector"]:
+                origins["vector_only"] += 1
+            else:
+                origins["keyword_only"] += 1
+
         return {
-            "documents": [combined_docs],
-            "metadatas": [combined_metadata],
-            "ids": [list(seen_ids)[:n_results]],
+            "documents": [documents],
+            "metadatas": [metadatas],
+            "ids": [ids],
+            "origins": origins,
+            "scores": [info["score"] for _, info in sorted_results],
         }
