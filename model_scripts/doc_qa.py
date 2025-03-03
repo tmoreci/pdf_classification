@@ -178,7 +178,7 @@ class GeminiLLM(LLM):
     def _handle_tool_call(self, response):
         print(response)
         query = response[0].args["query"]
-        tool_result = self.db.vector_search(query)
+        tool_result = self.db.hybrid_search(query)
         return tool_result
 
     def generate_answer(self, question, document, temperature=None):

@@ -101,22 +101,35 @@ class DocumentDatabase:
         )
         return results
 
-    def keyword_search(self, query, field="abstract", n_results=5):
-        """Keyword search on metadata using BM25"""
-        # Get all documents with their metadata
+    def keyword_search(self, query, n_results=5):
+        """
+        Perform keyword search on document content using BM25 algorithm.
+
+        This method applies BM25 ranking directly to the document content rather than
+        metadata fields, which provides better full-text search capabilities.
+
+        Parameters:
+        - query (str): The search query text
+        - n_results (int): Number of results to return
+
+        Returns:
+        - dict: Search results containing documents, metadatas, and ids
+        """
+        # Get all documents
         all_docs = self.collection.get()
 
-        if not all_docs["metadatas"]:
+        if not all_docs["documents"]:
             return {"documents": [], "metadatas": [], "ids": []}
 
-        # Extract the specified metadata field
+        # Extract the document texts and filter out empty documents
         texts = []
         valid_indices = []
 
-        for i, metadata in enumerate(all_docs["metadatas"]):
-            if field in metadata and metadata[field]:
-                texts.append(metadata[field])
+        for i, doc in enumerate(all_docs["documents"]):
+            if doc and doc.strip():  # Ensure document has content
+                texts.append(doc)
                 valid_indices.append(i)
+
         # Tokenize the texts for BM25
         tokenized_corpus = [self._tokenize(text) for text in texts]
 
@@ -135,12 +148,14 @@ class DocumentDatabase:
             "documents": [[all_docs["documents"][i]] for i in original_indices],
             "metadatas": [[all_docs["metadatas"][i]] for i in original_indices],
             "ids": [[all_docs["ids"][i]] for i in original_indices],
+            "scores": [
+                [scores[i]] for i in top_indices
+            ],  # Include scores in the response
         }
 
     def hybrid_search(
         self,
         query,
-        field="abstract",
         n_results=5,
         semantic_weight=0.8,
         keyword_weight=0.2,
@@ -164,7 +179,7 @@ class DocumentDatabase:
 
         # Get results from both methods
         vector_results = self.vector_search(query, initial_recall)
-        keyword_results = self.keyword_search(query, field, initial_recall)
+        keyword_results = self.keyword_search(query, initial_recall)
 
         # Track and score all retrieved document IDs
         doc_scores = {}
