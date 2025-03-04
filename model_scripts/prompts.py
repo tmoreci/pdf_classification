@@ -72,7 +72,8 @@ Answer the user's query to the best of your ability, citing relevant retrieved d
 
 ## Output Instructions
 When referencing content from the retrieved documents, use the following citation format:
-Add [i] at the end of the relevant sentence, Where i is the number of the relevant document
+Add [i] at the end of the relevant sentence, Where i is the number of the relevant document.
+If there are multiple documents that need to be cited in one sentence, structure the citations in seperate blocks (e.g. [1][2][3])
 
 ### User Query
 {{user_query}}
