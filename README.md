@@ -1,5 +1,5 @@
 # Research Paper Q&A Assistant
-The main functionality of this tool is for Q&A over an uploaded PDF with a local vector database storing summaries of additional research papers that can be used in analysis. The tool is powered by Gemini-2.0-Flash, which is provided a tool for querying the database for relevant summaries and is prompted to cite these summaries as needed. The retrieval method is a combination of cosine similarity search on the embeddings and BM25 on the actual summaries, inspired by Anthropic's work on contextual document embeddings. I've also added some topic modelling analysis using the BERTopic package, to help get a better sense of what documents you can actually retrieve from your local database.
+The main functionality of this tool is for Q&A over an uploaded PDF with a local vector database storing summaries of additional research papers that can be used in analysis. The tool is powered by Gemini-2.0-Flash, which is provided a tool for querying the database for relevant summaries and is prompted to cite these summaries as needed. The retrieval method is a combination of cosine similarity search on the embeddings and BM25 on the actual summaries, inspired by Anthropic's work on contextual document embeddings. I've also added some topic modelling analysis using the BERTopic package to help get a better sense of what documents you can actually retrieve from your local database.
 
 ## Features
 
@@ -102,7 +102,7 @@ Then open your browser to http://localhost:8501
 - **Text Embeddings**: Sentence transformers for document vectorization
 - **LLM Integration**: Google Gemini API for question answering
 - **Topic Modeling**: BERTopic for document clustering and theme discovery
-- **PDF Processing**: PyMuPDF for document parsing and extraction, Gemini for absstract and summary extraction
+- **PDF Processing**: PyMuPDF for document parsing and extraction, Gemini for abstract and summary extraction
 
 ### Search Capabilities
 
