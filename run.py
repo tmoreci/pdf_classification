@@ -13,6 +13,7 @@ def main():
     # Ensure necessary directories exist
     os.makedirs("data/chroma_db", exist_ok=True)
     os.makedirs("data/temp", exist_ok=True)
+    os.makedirs("pages", exist_ok=True)
 
     # Launch the Streamlit app
     try:
