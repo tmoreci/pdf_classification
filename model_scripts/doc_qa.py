@@ -36,7 +36,9 @@ class CohereLLM(LLM):
                         "type": "object",
                         "properties": {
                             "query": {
-                                "description": "A natural language query of the database. Include any keywords necessary",
+                                "description": (
+                                    "A natural language query of the database. Include any keywords necessary"
+                                ),
                                 "type": "string",
                             }
                         },
@@ -180,7 +182,7 @@ class GeminiLLM(LLM):
         retrieved_docs = []
         # Generate response
         response = self.llm.models.generate_content(
-            model="gemini-2.0-flash",
+            model=self.model,
             contents=[
                 types.Part.from_bytes(
                     data=file_path.read_bytes(),
@@ -200,7 +202,7 @@ class GeminiLLM(LLM):
                 enumerate=enumerate,
             )
             response = self.llm.models.generate_content(
-                model="gemini-2.0-flash",
+                model=self.model,
                 contents=[
                     types.Part.from_bytes(
                         data=file_path.read_bytes(),
