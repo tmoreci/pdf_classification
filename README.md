@@ -42,8 +42,8 @@ The application is built with a modular architecture:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/pdf-research-assistant.git
-   cd pdf-research-assistant
+   git clone https://github.com/tmoreci/pdf_qa
+   cd pdf_qa
    ```
 
 2. Create a virtual environment and install dependencies:
