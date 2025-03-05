@@ -1,5 +1,4 @@
 import cohere
-import yaml
 from prompts import (
     preamble,
     tool_description,

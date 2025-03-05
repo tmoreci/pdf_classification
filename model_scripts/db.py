@@ -47,7 +47,6 @@ class DocumentDatabase:
                 {
                     "doc_id": doc_id,
                     "title": llm_extraction.title,
-                    # "abstract": llm_extraction.abstract,
                 }
             ],
         )

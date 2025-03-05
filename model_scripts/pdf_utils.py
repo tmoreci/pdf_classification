@@ -58,7 +58,7 @@ def add_paper_chunks(
     return len(chunks)
 
 
-def add_papers(db_path, db_name, pdfs_path):
+def add_papers(db_path, db_name, pdfs_path, gemini):
     embedding_function = (
         embedding_functions.SentenceTransformerEmbeddingFunction(
             model_name="all-MiniLM-L6-v2"
@@ -76,16 +76,24 @@ def add_papers(db_path, db_name, pdfs_path):
     for i, file in tqdm(enumerate(files)):
         full_file_path = os.path.join(pdfs_path, file)
 
-        response = summary_extraction(full_file_path)
-        collection.add(
-            ids=[f"doc_{i}"],
-            documents=[response.summary],
-            metadatas=[
-                {
-                    "paper_title": response.title,
-                }
-            ],
-        )
+        response = summary_extraction(full_file_path, gemini)
+        print(response)
+        success = False
+        while not success:
+            try:
+                collection.add(
+                    ids=[f"doc_{i}"],
+                    documents=[response.summary],
+                    metadatas=[
+                        {
+                            "title": response.title,
+                        }
+                    ],
+                )
+                success = True
+            except Exception as e:
+                print(f"Error adding chunk {i}: {e}. Retrying in 30 seconds...")
+                time.sleep(30)
     return None
 
 
