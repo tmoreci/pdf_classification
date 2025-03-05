@@ -145,7 +145,7 @@ class TopicClustering:
             print(f"Found {len(topic_info) - 1} topics (excluding outliers)")
             print(topic_info)
 
-        return self.topics
+        return self.topics, self.probs
 
     def visualize_topics(self, width=800, height=600):
         """
@@ -318,8 +318,9 @@ class TopicClustering:
                 intensity = 0.5 + (
                     0.5 * (position / max(1, len(topic_data) - 2))
                 )
+                # Fix: Ensure RGB values don't exceed 255 (FF in hex)
                 colors.append(
-                    f"#{int(intensity * 60):02x}{int(intensity * 90):02x}{int(255 * intensity):02x}"
+                    f"#{min(255, int(intensity * 60)):02x}{min(255, int(intensity * 90)):02x}{min(255, int(intensity * 255)):02x}"
                 )
 
         # Create horizontal bars
@@ -515,16 +516,15 @@ if __name__ == "__main__":
     # Load documents
     documents = topic_clustering.load_documents_from_db()
 
-    try:
-        topics, probs = topic_clustering.basic_topic_modeling(min_topic_size=2)
-        print(f"Found topics: {np.unique(topics)}")
-        df = topic_clustering.get_document_info().head()
-        print(df)
-
-        # Try visualizing topics with fallback mechanism
-        fig = topic_clustering.visualize_topics()
-        if fig:
-            plt.show()
-    except Exception as e:
-        print(f"Error in topic modeling: {e}")
-        print("Try using different parameters or a larger document collection")
+    # topics, probs = topic_clustering.zero_shot_topic_modeling(
+    #     ["Agents", "Retrieval", "Training"]
+    # )
+    topics, probs = topic_clustering.basic_topic_modeling()
+    print(f"Found topics: {np.unique(topics)}")
+    df = topic_clustering.get_document_info().head()
+    print(df)
+    print("Trying visualization")
+    # Try visualizing topics with fallback mechanism
+    fig = topic_clustering.visualize_document_distribution()
+    if fig:
+        plt.show()
