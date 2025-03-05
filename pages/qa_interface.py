@@ -50,6 +50,7 @@ def show_qa_interface(initialize_systems, TEMP_DIR):
             ):
                 st.subheader("PDF Preview")
                 # Display PDF using PDF display hack
+                # ! To DO: Figure out why pdf doesn't display sometimes
                 with open(st.session_state.pdf_path, "rb") as f:
                     base64_pdf = base64.b64encode(f.read()).decode("utf-8")
                     pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="400" type="application/pdf"></iframe>'
