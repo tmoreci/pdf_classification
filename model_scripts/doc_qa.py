@@ -80,6 +80,7 @@ class CohereLLM(LLM):
             )
         return messages, tool_result
 
+    # ! ToDO Add citation handling for cohere model
     def generate_answer(self, question, document, temperature=None):
         """Generate answer using retrieved documents"""
         if temperature is None:

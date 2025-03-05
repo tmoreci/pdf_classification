@@ -100,7 +100,6 @@ class TopicClustering:
             min_topic_size=min_topic_size,
             nr_topics=nr_topics,
         )
-        print("Using precomputed embeddings from ChromaDB")
         self.topics, self.probs = self.topic_model.fit_transform(self.documents)
 
         if verbose:
@@ -138,6 +137,7 @@ class TopicClustering:
             zeroshot_min_similarity=min_similarity,
             representation_model=KeyBERTInspired(),
         )
+        # ! ToDO align embedding models so I can add precomputed embeddings here
         self.topics, self.probs = self.topic_model.fit_transform(self.documents)
 
         if verbose:
@@ -338,26 +338,9 @@ if __name__ == "__main__":
 
     # Load documents
     documents = topic_clustering.load_documents_from_db()
-    # print(f"Loaded {len(documents)} documents from the database")
 
-    # # Example 1: Basic topic modeling
-    # print("\nPerforming basic topic modeling...")
     topics, probs = topic_clustering.basic_topic_modeling(min_topic_size=2)
     print(f"Found topics: {np.unique(topics)}")
-    # print(f"Number of documents: {len(topic_clustering.documents)}")
-    # # Example 3: Zero-shot topic modeling
-    # print("\nPerforming zero-shot topic modeling...")
-    # predefined_topics = ["Agents", "Retrieval", "Training", "Evaluation"]
-    # topics = topic_clustering.zero_shot_topic_modeling(predefined_topics)
-
-    # Visualize results
-    # Example usage:
-    # Example usage:
-    # predefined_topics = ["Agents", "Retrieval", "Training", "Evaluation"]
-    # topics = topic_clustering.zero_shot_topic_modeling(predefined_topics)
     df = topic_clustering.get_document_info().head()
     print(df)
     topic_clustering.visualize_topics()
-    # Create and show visualization
-    # fig = topic_clustering.visualize_zero_shot_topics()
-    # plt.show()
