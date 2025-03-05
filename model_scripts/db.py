@@ -6,6 +6,7 @@ import os
 import re
 from tqdm import tqdm
 from google import genai
+from typing import Dict, List, Any, Optional, Tuple, Union
 
 
 class DocumentDatabase:
@@ -13,12 +14,20 @@ class DocumentDatabase:
 
     def __init__(
         self,
-        gemini_api,
-        db_path="../data/chroma_db",
-        collection_name="academic_papers",
-        model_name="all-MiniLM-L6-v2",
+        gemini_api: str,
+        db_path: str = "../data/chroma_db",
+        collection_name: str = "academic_papers",
+        model_name: str = "BAAI/bge-base-en-v1.5",
     ):
-        # ! Todo test out different embedding models
+        """
+        Initialize the document database with embedding functions and ChromaDB client.
+
+        Args:
+            gemini_api: API key for Gemini model access
+            db_path: Path to store the ChromaDB database
+            collection_name: Name of the collection to use
+            model_name: Name of the embedding model to use
+        """
         # Initialize embedding function
         self.embedding_function = (
             embedding_functions.SentenceTransformerEmbeddingFunction(
@@ -35,8 +44,14 @@ class DocumentDatabase:
         )
         self.gemini_client = genai.Client(api_key=gemini_api)
 
-    def add_document(self, file_path, doc_id):
-        """Process and add a document to the database with metadata"""
+    def add_document(self, file_path: str, doc_id: str) -> None:
+        """
+        Process and add a document to the database with metadata.
+
+        Args:
+            file_path: Path to the PDF file to process
+            doc_id: Unique identifier for the document
+        """
         # Extract abstract
         llm_extraction = summary_extraction(file_path, self.gemini_client)
 
@@ -50,10 +65,17 @@ class DocumentDatabase:
                 }
             ],
         )
-        pass
 
-    def index_directory(self, directory_path):
-        """Index all PDF documents in a directory"""
+    def index_directory(self, directory_path: str) -> int:
+        """
+        Index all PDF documents in a directory.
+
+        Args:
+            directory_path: Path to the directory containing PDF files
+
+        Returns:
+            Number of documents successfully indexed
+        """
         files = os.listdir(directory_path)
         indexed_count = 0
 
@@ -70,49 +92,48 @@ class DocumentDatabase:
 
         return indexed_count
 
-    def _tokenize(self, text):
-        """Tokenize text for BM25 search"""
+    def _tokenize(self, text: str) -> List[str]:
+        """
+        Tokenize text for BM25 search.
+
+        Args:
+            text: The text to tokenize
+
+        Returns:
+            List of tokens
+        """
         text = re.sub(r"[^\w\s]", "", text.lower())
         return text.split()
 
-    def vector_search(self, query, n_results=5):
+    def vector_search(self, query: str, n_results: int = 5) -> Dict[str, Any]:
         """
         Perform a semantic search on the document collection using vector embeddings.
 
-        This function leverages vector embeddings to find documents that are semantically
-        similar to the input query. It queries the collection of documents stored in the
-        chroma database and retrieves the top N results that best match the semantic content of
-        the query. The search is based on the vector representation of the documents and
-        the query, allowing for a more nuanced understanding of the content beyond simple
-        keyword matching.
-
-        Parameters:
-        - query (str): The natural language query for which the search is to be performed.
-        - n_results (int, optional): The number of top matching documents to retrieve.
-          Defaults to 5.
+        Args:
+            query: The natural language query for which the search is to be performed
+            n_results: The number of top matching documents to retrieve (default: 5)
 
         Returns:
-        - results (dict): A dictionary containing the search results, which includes the
-          documents, their metadata, and associated IDs that are most relevant to the query.
+            Dictionary containing the search results with documents, metadata, and IDs
         """
         results = self.collection.query(
             query_texts=[query], n_results=n_results
         )
         return results
 
-    def keyword_search(self, query, n_results=5):
+    def keyword_search(self, query: str, n_results: int = 5) -> Dict[str, Any]:
         """
         Perform keyword search on document content using BM25 algorithm.
 
         This method applies BM25 ranking directly to the document content rather than
         metadata fields, which provides better full-text search capabilities.
 
-        Parameters:
-        - query (str): The search query text
-        - n_results (int): Number of results to return
+        Args:
+            query: The search query text
+            n_results: Number of results to return
 
         Returns:
-        - dict: Search results containing documents, metadatas, and ids
+            Dictionary with search results containing documents, metadatas, and ids
         """
         # Get all documents
         all_docs = self.collection.get()
@@ -154,24 +175,23 @@ class DocumentDatabase:
 
     def hybrid_search(
         self,
-        query,
-        n_results=5,
-        semantic_weight=0.8,
-        keyword_weight=0.2,
-    ):
+        query: str,
+        n_results: int = 5,
+        semantic_weight: float = 0.8,
+        keyword_weight: float = 0.2,
+    ) -> Dict[str, Any]:
         """
         Enhanced hybrid search combining vector and keyword search with weighted rankings.
-        Based on Anthropic contextual document embeddings implementation
+        Based on Anthropic contextual document embeddings implementation.
 
-        Parameters:
-        - query (str): The search query
-        - field (str): Field to search in for keyword search
-        - n_results (int): Number of results to return
-        - semantic_weight (float): Weight for semantic search results (0-1)
-        - keyword_weight (float): Weight for keyword search results (0-1)
+        Args:
+            query: The search query
+            n_results: Number of results to return
+            semantic_weight: Weight for semantic search results (0-1)
+            keyword_weight: Weight for keyword search results (0-1)
 
         Returns:
-        - dict: Combined search results with ranking information
+            Dictionary with combined search results and ranking information
         """
         # Use a larger initial recall size for better reranking
         initial_recall = max(n_results * 5, 50)

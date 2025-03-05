@@ -9,20 +9,33 @@ from prompts import (
 from db import DocumentDatabase
 from jinja2 import Template
 import json
-from pdf_utils import full_text_parse
-from dotenv import load_dotenv
-import os
 import re
 from google import genai
 from google.genai import types
 from pathlib import Path
 from base import LLM
+from typing import Dict, List, Any, Optional, Tuple
 
 
 class CohereLLM(LLM):
-    """Handles LLM interactions for Q&A over retrieved documents"""
+    """Handles LLM interactions for Q&A over retrieved documents using Cohere's API"""
 
-    def __init__(self, api_key, database, model, temperature):
+    def __init__(
+        self,
+        api_key: str,
+        database: DocumentDatabase,
+        model: str,
+        temperature: float,
+    ):
+        """
+        Initialize the CohereLLM with the necessary configurations.
+
+        Args:
+            api_key: Cohere API key
+            database: DocumentDatabase instance for retrieval
+            model: Name of the Cohere model to use
+            temperature: Temperature parameter for response generation
+        """
         super().__init__(api_key, database, model, temperature)
         # Initialize LLM client
         self.llm = cohere.ClientV2(api_key)
@@ -48,9 +61,18 @@ class CohereLLM(LLM):
         ]
         self.functions_map = {"abstract_search": self.db.vector_search}
 
-    def _handle_tool_call(self, messages, response):
+    def _handle_tool_call(
+        self, messages: List[Dict[str, Any]], response: Any
+    ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
         """
-        Based on Cohere API docs
+        Handle the tool calls from the Cohere API response.
+
+        Args:
+            messages: List of message objects in the conversation
+            response: Response object from Cohere API
+
+        Returns:
+            Tuple containing updated messages and tool result
         """
         messages.append(
             {
@@ -82,9 +104,20 @@ class CohereLLM(LLM):
             )
         return messages, tool_result
 
-    # ! ToDO Add citation handling for cohere model
-    def generate_answer(self, question, document, temperature=None):
-        """Generate answer using retrieved documents"""
+    def generate_answer(
+        self, question: str, document: str, temperature: Optional[float] = None
+    ) -> str:
+        """
+        Generate an answer to a question using retrieved documents.
+
+        Args:
+            question: User's question to answer
+            document: Document content to use as context
+            temperature: Optional temperature override
+
+        Returns:
+            Generated answer text
+        """
         if temperature is None:
             temperature = self.temperature
         prompt_template = Template(user_message)
@@ -119,9 +152,24 @@ class CohereLLM(LLM):
 
 
 class GeminiLLM(LLM):
-    """Handles LLM interactions for Q&A over retrieved documents"""
+    """Handles LLM interactions for Q&A over retrieved documents using Google's Gemini API"""
 
-    def __init__(self, api_key, database, model, temperature):
+    def __init__(
+        self,
+        api_key: str,
+        database: DocumentDatabase,
+        model: str,
+        temperature: float,
+    ):
+        """
+        Initialize the GeminiLLM with the necessary configurations.
+
+        Args:
+            api_key: Gemini API key
+            database: DocumentDatabase instance for retrieval
+            model: Name of the Gemini model to use
+            temperature: Temperature parameter for response generation
+        """
         super().__init__(api_key, database, model, temperature)
         # Initialize LLM client
         self.llm = genai.Client(api_key=api_key)
@@ -144,17 +192,16 @@ class GeminiLLM(LLM):
             "automatic_function_calling": {"disable": True},
         }
 
-    def _extract_citations(self, llm_response):
+    def _extract_citations(self, llm_response: str) -> List[int]:
         """
         Extracts document citations from an LLM response that uses [i] citation format.
 
         Args:
-            llm_response (str): The text response from the LLM with citations in [i] format.
+            llm_response: The text response from the LLM with citations in [i] format
 
         Returns:
-            list: A list of unique document indices that were cited in the response.
+            List of unique document indices that were cited in the response
         """
-
         # Find all citations in the format [i]
         citation_pattern = r"\[(\d+)\]"
         citations = re.findall(citation_pattern, llm_response)
@@ -165,14 +212,35 @@ class GeminiLLM(LLM):
 
         return unique_cited_docs
 
-    def _handle_tool_call(self, response):
+    def _handle_tool_call(self, response: List[Any]) -> Dict[str, Any]:
+        """
+        Handle tool calls from the Gemini API response.
+
+        Args:
+            response: Function call response from Gemini API
+
+        Returns:
+            Results from the database query
+        """
         print(response)
         query = response[0].args["query"]
         tool_result = self.db.hybrid_search(query)
         return tool_result
 
-    def generate_answer(self, question, document, temperature=None):
-        """Generate answer using retrieved documents"""
+    def generate_answer(
+        self, question: str, document: str, temperature: Optional[float] = None
+    ) -> Tuple[Any, List[int], Dict[str, Any]]:
+        """
+        Generate an answer to a question using a document and retrieved context.
+
+        Args:
+            question: User's question to answer
+            document: Path to the PDF document
+            temperature: Optional temperature override
+
+        Returns:
+            Tuple containing the response object, cited document indices, and retrieved documents
+        """
         if temperature is None:
             temperature = self.temperature
         prompt_template = Template(gemini_prompt)

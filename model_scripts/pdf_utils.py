@@ -1,6 +1,7 @@
 from tqdm import tqdm
 import pymupdf
 import os
+import time
 from google import genai
 from google.genai import types
 import chromadb
@@ -11,9 +12,19 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from dotenv import load_dotenv
 from prompts import summary_prompt, abstract_prompt
 from base import Extraction, Summary
+from typing import Dict, List, Any, Optional, Union
 
 
-def full_text_parse(file_path):
+def full_text_parse(file_path: str) -> str:
+    """
+    Parse the full text content of a PDF file.
+
+    Args:
+        file_path: Path to the PDF file
+
+    Returns:
+        String containing the full text content of the PDF
+    """
     loader = PyMuPDFLoader(file_path)
     documents = loader.load()
     document_parts = []  # Initialize a list to collect parts of the document
@@ -24,8 +35,25 @@ def full_text_parse(file_path):
 
 
 def add_paper_chunks(
-    pdf_path, paper_id, collection, metadata=None, add_context=False
-):
+    pdf_path: str,
+    paper_id: str,
+    collection: Any,
+    metadata: Optional[Dict[str, Any]] = None,
+    add_context: bool = False,
+) -> int:
+    """
+    Split a PDF into chunks and add them to a ChromaDB collection.
+
+    Args:
+        pdf_path: Path to the PDF file
+        paper_id: Unique identifier for the paper
+        collection: ChromaDB collection to add chunks to
+        metadata: Additional metadata to store with each chunk
+        add_context: Whether to add context to each chunk using Gemini
+
+    Returns:
+        Number of chunks added to the collection
+    """
     # Load and split the PDF
     loader = PyMuPDFLoader(pdf_path)
     documents = loader.load()
@@ -58,7 +86,16 @@ def add_paper_chunks(
     return len(chunks)
 
 
-def add_papers(db_path, db_name, pdfs_path, gemini):
+def add_papers(db_path: str, db_name: str, pdfs_path: str, gemini: Any) -> None:
+    """
+    Add multiple papers from a directory to a ChromaDB collection.
+
+    Args:
+        db_path: Path to the ChromaDB database
+        db_name: Name of the collection
+        pdfs_path: Path to the directory containing PDF files
+        gemini: Initialized Gemini client
+    """
     embedding_function = (
         embedding_functions.SentenceTransformerEmbeddingFunction(
             model_name="all-MiniLM-L6-v2"
@@ -94,10 +131,20 @@ def add_papers(db_path, db_name, pdfs_path, gemini):
             except Exception as e:
                 print(f"Error adding chunk {i}: {e}. Retrying in 30 seconds...")
                 time.sleep(30)
-    return None
 
 
-def gemini_add_context(file: str, chunk, client):
+def gemini_add_context(file: str, chunk: str, client: Any) -> str:
+    """
+    Add contextual information to a document chunk using Gemini.
+
+    Args:
+        file: Path to the PDF file
+        chunk: Text chunk to add context to
+        client: Initialized Gemini client
+
+    Returns:
+        Chunk with added context
+    """
     chunk_addition = f"""
 <chunk> 
 {chunk}
@@ -121,17 +168,16 @@ The provided chunk is a small subsection of the full PDF document you have been 
     return output
 
 
-def summary_extraction(file_path: str, client):
+def summary_extraction(file_path: str, client: Any) -> Summary:
     """
-    Extract title and abstract from scientific article PDFs using Gemini API
-    with updated PyMuPDF syntax.
+    Extract title and summary from scientific article PDFs using Gemini API.
 
     Args:
         file_path: Path to the PDF file
         client: Initialized Gemini API client
 
     Returns:
-        Parsed JSON response with title and abstract
+        Parsed Summary object with title and summary
     """
     # Open the document with PyMuPDF
     file_path = Path(file_path)
@@ -156,17 +202,16 @@ def summary_extraction(file_path: str, client):
     return response.parsed
 
 
-def abstract_extraction(file_path: str, client):
+def abstract_extraction(file_path: str, client: Any) -> Extraction:
     """
-    Extract title and abstract from scientific article PDFs using Gemini API
-    with updated PyMuPDF syntax.
+    Extract title and abstract from scientific article PDFs using Gemini API.
 
     Args:
         file_path: Path to the PDF file
         client: Initialized Gemini API client
 
     Returns:
-        Parsed JSON response with title and abstract
+        Parsed Extraction object with title and abstract
     """
 
     # Open the document with PyMuPDF
@@ -203,27 +248,19 @@ def abstract_extraction(file_path: str, client):
     return response.parsed
 
 
-def query_papers(query_text, collection, n_results=5):
+def query_papers(
+    query_text: str, collection: Any, n_results: int = 5
+) -> Dict[str, Any]:
+    """
+    Query a collection of papers with a search query.
+
+    Args:
+        query_text: The search query
+        collection: ChromaDB collection to search
+        n_results: Number of results to return
+
+    Returns:
+        Search results from the collection
+    """
     results = collection.query(query_texts=[query_text], n_results=n_results)
     return results
-
-
-if __name__ == "__main__":
-    load_dotenv(".env")
-    embedding_function = (
-        embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2"
-        )
-    )
-
-    # Initialize ChromaDB (persistent)
-    client = chromadb.PersistentClient(path="../data/chroma_db")
-
-    # Create or get collection
-    collection = client.get_or_create_collection(
-        name="academic_papers", embedding_function=embedding_function
-    )
-    db_path = "../data/chroma_db"
-    pdfs_path = "../data"
-    db_name = "academic_papers"
-    add_papers(db_path, db_name, pdfs_path)
