@@ -1,426 +1,309 @@
 import streamlit as st
 import matplotlib.pyplot as plt
-import io
-import numpy as np
 import pandas as pd
+import numpy as np
 from model_scripts.topic_clustering import TopicClustering
 from model_scripts.streamlit_utils import st_error_handling
 
 
 def show_topic_clustering(initialize_systems):
     """
-    Display the Topic Clustering page.
+    Display the topic clustering interface page.
+
+    This page allows users to analyze document collections using topic clustering techniques.
 
     Args:
-        initialize_systems: Function to initialize database and LLM systems
+        initialize_systems: Function to initialize database and LLM
     """
     st.title("Document Topic Clustering")
 
-    if not st.session_state.gemini_api_key:
-        st.warning(
-            "Please enter your Gemini API key in the sidebar to continue."
-        )
-    else:
-        # Initialize systems if needed
-        if "db" not in st.session_state or st.session_state.db is None:
-            initialize_systems()
+    # Check if systems are initialized
+    if not initialize_systems():
+        return
 
-        st.write(
-            """
-        This interface allows you to discover topics in your document collection using two methods:
-        1. **Unsupervised Clustering**: Automatically finds topics in your documents
-        2. **Zero-Shot Topic Modeling**: Categorizes documents according to topics you define
-        """
+    # Show sidebar options
+    with st.sidebar:
+        st.subheader("Topic Modeling Settings")
+
+        model_type = st.radio(
+            "Topic Modeling Approach:",
+            ["Unsupervised", "Zero-Shot"],
+            help="Choose between unsupervised topic detection or pre-defined topic categories",
         )
 
-        # Check if we have documents in the database
-        with st_error_handling("Error accessing the database"):
-            collection_info = st.session_state.db.collection.get()
-            doc_count = (
-                len(collection_info["ids"]) if "ids" in collection_info else 0
+        if model_type == "Unsupervised":
+            min_topic_size = st.slider(
+                "Minimum Topic Size:",
+                min_value=2,
+                max_value=20,
+                value=5,
+                help="Minimum number of documents required to form a topic",
             )
 
-        if doc_count == 0:
-            st.warning(
-                "No documents found in the database. Please add documents in the Database Management page before clustering."
+            nr_topics = st.select_slider(
+                "Number of Topics:",
+                options=["auto", "5", "10", "20", "30", "50"],
+                value="auto",
+                help="Number of topics to extract ('auto' lets the algorithm decide)",
             )
-        else:
-            st.success(f"Found {doc_count} documents in the database.")
+            nr_topics = int(nr_topics) if nr_topics != "auto" else "auto"
 
-            # Create tabs for different clustering methods
-            clustering_method = st.radio(
-                "Select Clustering Method:",
-                ["Unsupervised Topic Modeling", "Zero-Shot Topic Modeling"],
+        else:  # Zero-Shot
+            min_topic_size = st.slider(
+                "Minimum Topic Size:",
+                min_value=1,
+                max_value=10,
+                value=3,
+                help="Minimum number of documents required to form a topic",
             )
 
-            # Initialize TopicClustering when needed
-            if "topic_clustering" not in st.session_state:
-                st.session_state.topic_clustering = None
+            min_similarity = st.slider(
+                "Minimum Similarity:",
+                min_value=0.1,
+                max_value=0.9,
+                value=0.4,
+                step=0.05,
+                help="Minimum similarity threshold for assigning documents to topics",
+            )
 
-            # Common settings
-            col1, col2 = st.columns(2)
-            with col1:
-                min_topic_size = st.slider(
-                    "Minimum Topic Size:",
-                    1,
-                    10,
-                    3,
-                    help="Minimum number of documents required to form a topic",
-                )
+            # Input for custom topics
+            topic_input = st.text_area(
+                "Enter Topics (one per line):",
+                value="Machine Learning\nReinforcement Learning\nNatural Language Processing\nComputer Vision\nNeural Networks",
+                help="Enter predefined topics, one per line",
+            )
+            custom_topics = [
+                topic.strip()
+                for topic in topic_input.split("\n")
+                if topic.strip()
+            ]
 
-            with col2:
-                if clustering_method == "Unsupervised Topic Modeling":
-                    nr_topics_options = ["auto", "5", "10", "15", "20"]
-                    nr_topics = st.selectbox(
-                        "Number of Topics:",
-                        nr_topics_options,
-                        help="'auto' lets the algorithm decide the optimal number",
+    # Main content
+    with st.spinner("Loading documents..."):
+        topic_clustering = TopicClustering(st.session_state.db)
+
+        try:
+            documents = topic_clustering.load_documents_from_db()
+            st.write(f"Loaded {len(documents)} documents from the database.")
+        except Exception as e:
+            st.error(f"Error loading documents: {e}")
+            return
+
+    # Run topic modeling
+    if st.button("Run Topic Analysis", type="primary"):
+        with st.spinner("Analyzing topics..."):
+            try:
+                if model_type == "Unsupervised":
+                    topics, probs = topic_clustering.basic_topic_modeling(
+                        min_topic_size=min_topic_size,
+                        nr_topics=nr_topics,
+                        verbose=False,
                     )
-                    # Convert to integer if not 'auto'
-                    if nr_topics != "auto":
-                        nr_topics = int(nr_topics)
+                    st.session_state.topic_model_type = "unsupervised"
+                else:
+                    topics = topic_clustering.zero_shot_topic_modeling(
+                        topic_list=custom_topics,
+                        min_similarity=min_similarity,
+                        min_topic_size=min_topic_size,
+                        verbose=False,
+                    )
+                    st.session_state.topic_model_type = "zero-shot"
 
-            # Zero-shot specific settings
-            if clustering_method == "Zero-Shot Topic Modeling":
-                st.subheader("Define Your Topics")
-                st.write(
-                    "Enter topics that you want to categorize documents into, one per line:"
+                # Store in session state for later use
+                st.session_state.topic_clustering = topic_clustering
+
+                # Success message
+                unique_topics = len(set(topics)) - (
+                    1 if -1 in topics else 0
+                )  # Exclude outliers
+                st.success(
+                    f"Topic analysis complete! Found {unique_topics} topics."
                 )
 
-                topic_text = st.text_area(
-                    "Topics:",
-                    "Agents\nRetrieval\nTraining\nEvaluation",
-                    height=150,
-                    help="Enter each topic on a new line",
+            except Exception as e:
+                st.error(f"Error in topic modeling: {e}")
+                st.exception(e)
+                return
+
+    # Display results if topic model exists
+    if (
+        hasattr(st.session_state, "topic_clustering")
+        and st.session_state.topic_clustering.topic_model
+    ):
+        topic_clustering = st.session_state.topic_clustering
+
+        # Create tabs for different visualizations
+        tab1, tab2, tab3 = st.tabs(
+            ["Topic Overview", "Topic Distribution", "Document Details"]
+        )
+
+        with tab1:
+            st.subheader("Topic Overview")
+
+            # Show topic info table
+            topic_info = topic_clustering.get_topic_info()
+
+            # Clean up the display
+            display_info = topic_info.copy()
+            display_info["Name"] = display_info["Name"].apply(
+                lambda x: (
+                    ", ".join(x.split("_")[:3]) if x != "-1" else "Outliers"
+                )
+            )
+            display_info = display_info.rename(
+                columns={
+                    "Topic": "Topic ID",
+                    "Count": "Documents",
+                    "Name": "Top Words",
+                }
+            )
+
+            st.dataframe(
+                display_info[["Topic ID", "Documents", "Top Words"]],
+                hide_index=True,
+                use_container_width=True,
+            )
+
+            # Topic visualization
+            st.subheader("Topic Visualization")
+
+            try:
+                if st.session_state.topic_model_type == "unsupervised":
+                    fig = topic_clustering.visualize_topics()
+                else:
+                    fig = topic_clustering.visualize_zero_shot_topics()
+
+                if fig:
+                    st.pyplot(fig)
+                    plt.close(fig)
+            except Exception as e:
+                st.error(f"Error in visualization: {e}")
+                # Try fallback
+                try:
+                    fig = topic_clustering.visualize_document_distribution()
+                    st.pyplot(fig)
+                    plt.close(fig)
+                except Exception as e2:
+                    st.error(f"Fallback visualization also failed: {e2}")
+
+        with tab2:
+            st.subheader("Document Distribution by Topic")
+
+            # Document distribution visualization
+            try:
+                top_n = st.slider("Number of topics to display:", 3, 15, 8)
+                fig = topic_clustering.visualize_document_distribution(
+                    top_n=top_n
+                )
+                st.pyplot(fig)
+                plt.close(fig)
+            except Exception as e:
+                st.error(
+                    f"Error creating document distribution visualization: {e}"
                 )
 
-                topic_list = [
-                    t.strip() for t in topic_text.split("\n") if t.strip()
+        with tab3:
+            st.subheader("Document Details")
+
+            # Get document info
+            doc_info = topic_clustering.get_document_info()
+
+            # Add topic label column if missing
+            if "topic_label" not in doc_info.columns:
+                # Create topic labels
+                topic_labels = {}
+                for topic_id in doc_info["topic"].unique():
+                    if topic_id == -1:
+                        topic_labels[topic_id] = "Outliers"
+                    else:
+                        try:
+                            topic_words = (
+                                topic_clustering.topic_model.get_topic(topic_id)
+                            )
+                            if topic_words:
+                                top_words = [
+                                    word for word, _ in topic_words[:3]
+                                ]
+                                topic_labels[topic_id] = (
+                                    f"Topic {topic_id}: {', '.join(top_words)}"
+                                )
+                            else:
+                                topic_labels[topic_id] = f"Topic {topic_id}"
+                        except:
+                            topic_labels[topic_id] = f"Topic {topic_id}"
+
+                doc_info["topic_label"] = [
+                    topic_labels.get(tid, f"Topic {tid}")
+                    for tid in doc_info["topic"]
                 ]
 
-                min_similarity = st.slider(
-                    "Minimum Similarity:",
-                    0.1,
-                    0.9,
-                    0.4,
-                    0.05,
-                    help="Minimum similarity threshold for assigning documents to topics",
+            # Display sample of documents with their assigned topics
+            st.dataframe(
+                doc_info[["topic", "topic_label", "document"]].head(50),
+                column_config={
+                    "document": st.column_config.TextColumn(
+                        "Document Content",
+                        width="large",
+                        help="First 100 characters of document content",
+                        max_chars=100,
+                    ),
+                    "topic": st.column_config.NumberColumn(
+                        "Topic ID", help="Topic ID assigned to document"
+                    ),
+                    "topic_label": st.column_config.TextColumn(
+                        "Topic Label", help="Human-readable topic description"
+                    ),
+                },
+                hide_index=True,
+                use_container_width=True,
+            )
+
+            # Filter by topic
+            if len(doc_info) > 0:
+                st.subheader("Filter by Topic")
+                topics = sorted(doc_info["topic"].unique())
+                selected_topic = st.selectbox(
+                    "Select a topic to view its documents:",
+                    topics,
+                    format_func=lambda x: (
+                        "Outliers" if x == -1 else f"Topic {x}"
+                    ),
                 )
 
-                # Display the topics that will be used
-                st.write(
-                    f"Will cluster documents into these {len(topic_list)} topics:"
-                )
-                st.write(", ".join(topic_list))
+                filtered_docs = doc_info[doc_info["topic"] == selected_topic]
 
-            # Run clustering button
-            if st.button("Run Topic Clustering", type="primary"):
-                with st.spinner("Loading documents and computing topics..."):
+                # Get keywords for this topic if available
+                topic_keywords = "N/A"
+                if selected_topic != -1:
                     try:
-                        # Initialize topic clustering
-                        topic_clustering = TopicClustering(st.session_state.db)
-                        st.session_state.topic_clustering = topic_clustering
-
-                        # Load documents
-                        documents = topic_clustering.load_documents_from_db()
-
-                        if len(documents) < min_topic_size:
-                            st.error(
-                                f"Not enough documents. You have {len(documents)} documents but need at least {min_topic_size} for the minimum topic size."
+                        words = topic_clustering.topic_model.get_topic(
+                            selected_topic
+                        )
+                        if words:
+                            topic_keywords = ", ".join(
+                                [word for word, _ in words[:10]]
                             )
-                        else:
-                            # Run the appropriate clustering method
-                            if (
-                                clustering_method
-                                == "Unsupervised Topic Modeling"
-                            ):
-                                with st_error_handling(
-                                    "Error during topic modeling"
-                                ):
-                                    st.info(
-                                        f"Running unsupervised clustering with min_topic_size={min_topic_size} and nr_topics={nr_topics}"
-                                    )
-                                    topics, probs = (
-                                        topic_clustering.basic_topic_modeling(
-                                            min_topic_size=min_topic_size,
-                                            nr_topics=nr_topics,
-                                            verbose=False,
-                                        )
-                                    )
+                    except:
+                        pass
 
-                                    # Store results in session state
-                                    st.session_state.topics = topics
-                                    st.session_state.probs = probs
-
-                                    # Success message
-                                    topic_info = (
-                                        topic_clustering.get_topic_info()
-                                    )
-                                    num_topics = len(
-                                        topic_info[topic_info["Topic"] != -1]
-                                    )
-                                    st.success(
-                                        f"Successfully identified {num_topics} topics from {len(documents)} documents"
-                                    )
-
-                            else:  # Zero-Shot Topic Modeling
-                                with st_error_handling(
-                                    "Error during zero-shot topic modeling"
-                                ):
-                                    st.info(
-                                        f"Running zero-shot clustering with {len(topic_list)} defined topics"
-                                    )
-                                    topics = topic_clustering.zero_shot_topic_modeling(
-                                        topic_list=topic_list,
-                                        min_similarity=min_similarity,
-                                        min_topic_size=min_topic_size,
-                                        verbose=False,
-                                    )
-
-                                    # Store results in session state
-                                    st.session_state.topics = topics
-
-                                    # Success message
-                                    topic_info = (
-                                        topic_clustering.get_topic_info()
-                                    )
-                                    num_topics = len(
-                                        topic_info[topic_info["Topic"] != -1]
-                                    )
-                                    st.success(
-                                        f"Successfully categorized documents into {num_topics} topics"
-                                    )
-
-                            # Set flag to show results
-                            st.session_state.show_topic_results = True
-
-                    except Exception as e:
-                        st.error(f"Error in topic clustering: {str(e)}")
-                        st.exception(e)
-
-            # Display results if available
-            if (
-                st.session_state.get("show_topic_results", False)
-                and st.session_state.topic_clustering
-            ):
-                st.markdown("---")
-                st.subheader("Topic Clustering Results")
-
-                # Create tabs for different views
-                results_tab1, results_tab2, results_tab3 = st.tabs(
-                    ["Topic Overview", "Document Topics", "Visualization"]
+                st.markdown(f"**Keywords:** {topic_keywords}")
+                st.markdown(
+                    f"**Documents in this topic:** {len(filtered_docs)}"
                 )
 
-                # Tab 1: Topic Overview
-                with results_tab1:
-                    try:
-                        topic_info = (
-                            st.session_state.topic_clustering.get_topic_info()
+                # Display documents in this topic
+                for i, (_, row) in enumerate(filtered_docs.head(10).iterrows()):
+                    with st.expander(f"Document {i+1}"):
+                        st.markdown(
+                            f"**Probability:** {row.get('probability', 'N/A'):.3f}"
                         )
-
-                        # Format the DataFrame for display
-                        display_info = topic_info.copy()
-
-                        # Handle the special case of -1 (outliers)
-                        display_info.loc[
-                            display_info["Topic"] == -1, "Name"
-                        ] = "Outliers"
-
-                        # Display the topic information
-                        st.dataframe(display_info, use_container_width=True)
-
-                        # Summary statistics
-                        total_docs = display_info["Count"].sum()
-                        outlier_count = (
-                            display_info.loc[
-                                display_info["Topic"] == -1, "Count"
-                            ].values[0]
-                            if -1 in display_info["Topic"].values
-                            else 0
+                        if "title" in row:
+                            st.markdown(f"**Title:** {row['title']}")
+                        st.text_area(
+                            "Content:",
+                            row["document"][:1000]
+                            + ("..." if len(row["document"]) > 1000 else ""),
+                            height=150,
+                            key=f"doc_{i}",
+                            disabled=True,
                         )
-
-                        col1, col2, col3 = st.columns(3)
-                        col1.metric("Total Documents", total_docs)
-                        col2.metric(
-                            "Categorized Documents", total_docs - outlier_count
-                        )
-                        col3.metric("Outliers", outlier_count)
-
-                    except Exception as e:
-                        st.error(f"Error displaying topic overview: {str(e)}")
-
-                # Tab 2: Document Topics
-                with results_tab2:
-                    try:
-                        doc_info = (
-                            st.session_state.topic_clustering.get_document_info()
-                        )
-
-                        # Preview of documents and their assigned topics
-                        st.write("Documents and their assigned topics:")
-
-                        # Add a preview column with truncated document text
-                        doc_info["Preview"] = doc_info["document"].apply(
-                            lambda x: x[:200] + "..." if len(x) > 200 else x
-                        )
-
-                        # Select columns to display
-                        display_columns = ["topic"]
-
-                        # Add metadata columns if available
-                        metadata_cols = [
-                            col
-                            for col in doc_info.columns
-                            if col
-                            not in [
-                                "document",
-                                "topic",
-                                "probability",
-                                "Preview",
-                            ]
-                        ]
-                        display_columns.extend(metadata_cols)
-                        display_columns.extend(["Preview"])
-
-                        # Display the DataFrame
-                        st.dataframe(
-                            doc_info[display_columns], use_container_width=True
-                        )
-
-                        # Allow downloading the full document-topic assignments
-                        csv = doc_info.to_csv(index=False)
-                        st.download_button(
-                            label="Download Document Topic Data",
-                            data=csv,
-                            file_name="document_topics.csv",
-                            mime="text/csv",
-                        )
-
-                    except Exception as e:
-                        st.error(f"Error displaying document topics: {str(e)}")
-
-                # Tab 3: Visualization
-                with results_tab3:
-                    try:
-                        # For zero-shot topic modeling, use specialized visualization
-                        if clustering_method == "Zero-Shot Topic Modeling":
-                            st.write("Zero-Shot Topic Distribution:")
-
-                            # Create figure
-                            fig = (
-                                st.session_state.topic_clustering.visualize_zero_shot_topics()
-                            )
-                            st.pyplot(fig)
-
-                            # Convert matplotlib figure to bytes for download
-                            buf = io.BytesIO()
-                            fig.savefig(
-                                buf, format="png", dpi=300, bbox_inches="tight"
-                            )
-                            buf.seek(0)
-
-                            # Add download button
-                            st.download_button(
-                                label="Download Topic Visualization",
-                                data=buf,
-                                file_name="topic_distribution.png",
-                                mime="image/png",
-                            )
-
-                        # For unsupervised modeling, try to use the interactive visualization
-                        else:
-                            # We need at least 10 documents for the UMAP visualization
-                            if len(st.session_state.topics) >= 10:
-                                st.write("Topic Visualization:")
-                                fig = (
-                                    st.session_state.topic_clustering.visualize_topics()
-                                )
-
-                                # Check if we got a figure back
-                                if fig:
-                                    from streamlit.components.v1 import html
-
-                                    # Convert the figure to HTML and display
-                                    html_str = fig.to_html()
-                                    html(html_str, height=600)
-                                else:
-                                    st.warning(
-                                        "Not enough distinct topics for interactive visualization."
-                                    )
-                            else:
-                                st.warning(
-                                    "Not enough documents for the interactive visualization (need at least 10)."
-                                )
-
-                            # Fallback to a simpler visualization
-                            st.write("Topic Distribution:")
-
-                            # Create a simple bar chart of document counts per topic
-                            topic_counts = np.unique(
-                                st.session_state.topics, return_counts=True
-                            )
-                            topic_ids = topic_counts[0]
-                            counts = topic_counts[1]
-
-                            # Create DataFrame for plotting
-                            topic_df = pd.DataFrame(
-                                {
-                                    "Topic": [
-                                        f"Topic {t}" if t != -1 else "Outliers"
-                                        for t in topic_ids
-                                    ],
-                                    "Count": counts,
-                                }
-                            )
-
-                            # Sort by topic ID
-                            topic_df = topic_df.sort_values("Topic")
-
-                            # Create and display bar chart
-                            fig, ax = plt.subplots(figsize=(10, 6))
-                            bars = ax.bar(
-                                topic_df["Topic"],
-                                topic_df["Count"],
-                                color=[
-                                    "#ff9999" if "Outliers" in t else "#5599ff"
-                                    for t in topic_df["Topic"]
-                                ],
-                            )
-
-                            # Add count labels on top of bars
-                            for bar in bars:
-                                height = bar.get_height()
-                                ax.text(
-                                    bar.get_x() + bar.get_width() / 2.0,
-                                    height + 0.1,
-                                    f"{height:.0f}",
-                                    ha="center",
-                                    va="bottom",
-                                )
-
-                            ax.set_title("Document Count by Topic")
-                            ax.set_xlabel("Topics")
-                            ax.set_ylabel("Number of Documents")
-                            plt.xticks(rotation=45, ha="right")
-                            plt.tight_layout()
-
-                            st.pyplot(fig)
-
-                            # Convert matplotlib figure to bytes for download
-                            buf = io.BytesIO()
-                            fig.savefig(
-                                buf, format="png", dpi=300, bbox_inches="tight"
-                            )
-                            buf.seek(0)
-
-                            # Add download button
-                            st.download_button(
-                                label="Download Topic Visualization",
-                                data=buf,
-                                file_name="topic_distribution.png",
-                                mime="image/png",
-                            )
-
-                    except Exception as e:
-                        st.error(f"Error creating visualization: {str(e)}")
-                        st.exception(e)

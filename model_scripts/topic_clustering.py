@@ -149,7 +149,11 @@ class TopicClustering:
 
     def visualize_topics(self, width=800, height=600):
         """
-        Visualize the discovered topics.
+        Visualize the discovered topics with fallback to basic bar chart if UMAP visualization fails.
+
+        The primary visualization uses BERTopic's built-in visualization which requires sufficient topics.
+        If that fails (typically due to too few topics), a basic bar chart showing document counts per topic
+        is displayed instead.
 
         Args:
             width: Width of the visualization
@@ -162,11 +166,183 @@ class TopicClustering:
             raise ValueError(
                 "No topic model available. Run a topic modeling method first."
             )
-        # ! To DO: write my own visualization function
-        if len(self.topics) < 10:
-            print("Not enough topics to visualize without UMAP error")
-            return None
-        fig = self.topic_model.visualize_topics(width=width, height=height)
+
+        try:
+            # First attempt to use BERTopic's built-in visualization
+            fig = self.topic_model.visualize_topics(width=width, height=height)
+            return fig
+        except (ValueError, Exception) as e:
+            # Fallback to basic bar chart visualization
+            print(f"BERTopic visualization failed: {str(e)}")
+            print("Falling back to basic topic count visualization")
+
+            # Count documents per topic
+            topic_counts = Counter(self.topics)
+
+            # Sort topics by their IDs
+            sorted_topics = sorted(topic_counts.keys())
+
+            # Create figure with appropriate size (convert pixels to inches for matplotlib)
+            fig_width = width / 100  # Rough approximation for inch conversion
+            fig_height = height / 100
+            fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+
+            # Create labels with topic keywords when available
+            x_labels = []
+            for topic_id in sorted_topics:
+                if topic_id == -1:
+                    x_labels.append("Outliers")
+                else:
+                    # Try to get topic keywords if available
+                    try:
+                        topic_info = self.topic_model.get_topic(topic_id)
+                        if topic_info and len(topic_info) > 0:
+                            # Use the top keyword to identify the topic
+                            keyword = topic_info[0][0]
+                            x_labels.append(f"Topic {topic_id}: {keyword}")
+                        else:
+                            x_labels.append(f"Topic {topic_id}")
+                    except:
+                        x_labels.append(f"Topic {topic_id}")
+
+            # Set colors (red for outliers, blue for regular topics)
+            colors = [
+                "#ff9999" if topic_id == -1 else "#5599ff"
+                for topic_id in sorted_topics
+            ]
+
+            # Create bar chart
+            bars = ax.bar(
+                x_labels,
+                [topic_counts[topic_id] for topic_id in sorted_topics],
+                color=colors,
+            )
+
+            # Add count labels on top of bars
+            for bar in bars:
+                height = bar.get_height()
+                ax.text(
+                    bar.get_x() + bar.get_width() / 2.0,
+                    height + 0.1,
+                    f"{int(height)}",
+                    ha="center",
+                    va="bottom",
+                )
+
+            # Set title and labels
+            ax.set_title("Document Count by Topic")
+            ax.set_xlabel("Topics")
+            ax.set_ylabel("Number of Documents")
+
+            # Rotate labels if there are many topics
+            if len(x_labels) > 5:
+                plt.xticks(rotation=45, ha="right")
+
+            plt.tight_layout()
+
+            return fig
+
+    def visualize_document_distribution(
+        self, figsize=(10, 6), top_n=10, show_counts=True
+    ):
+        """
+        Visualize the distribution of documents across topics with a horizontal bar chart.
+
+        Args:
+            figsize: Tuple of (width, height) for the figure size
+            top_n: Number of top topics to display (excluding outliers)
+            show_counts: Whether to show the document count next to each bar
+
+        Returns:
+            Matplotlib figure object
+        """
+        if not self.topic_model or self.topics is None:
+            raise ValueError(
+                "No topic model available. Run a topic modeling method first."
+            )
+
+        # Count documents per topic
+        topic_counts = Counter(self.topics)
+
+        # Get topic information with labels
+        topic_info = self.topic_model.get_topic_info()
+
+        # Create a mapping from topic_id to representative words
+        topic_labels = {}
+        for _, row in topic_info.iterrows():
+            topic_id = row["Topic"]
+            if topic_id == -1:
+                topic_labels[topic_id] = "Outliers"
+            else:
+                # Get the words for this topic
+                words = row["Name"].split("_")
+                if len(words) > 1:  # Ensure we have some words
+                    label = f"Topic {topic_id}: {', '.join(words[:3])}"
+                    topic_labels[topic_id] = label
+                else:
+                    topic_labels[topic_id] = f"Topic {topic_id}"
+
+        # Filter to top N topics + outliers
+        topic_data = [(tid, count) for tid, count in topic_counts.items()]
+        topic_data.sort(
+            key=lambda x: (x[0] != -1, -x[1])
+        )  # Sort, keeping outliers first if present
+
+        # Limit to top N (but always include outliers if present)
+        if -1 in topic_counts:
+            if len(topic_data) > top_n + 1:  # +1 for outliers
+                topic_data = topic_data[: top_n + 1]
+        else:
+            if len(topic_data) > top_n:
+                topic_data = topic_data[:top_n]
+
+        # Extract data for plotting
+        topics = [
+            topic_labels.get(tid, f"Topic {tid}") for tid, _ in topic_data
+        ]
+        counts = [count for _, count in topic_data]
+
+        # Create horizontal bar chart
+        fig, ax = plt.subplots(figsize=figsize)
+
+        # Define colors (red for outliers, blue gradient for other topics)
+        colors = []
+        for tid, _ in topic_data:
+            if tid == -1:
+                colors.append("#ff9999")  # Red for outliers
+            else:
+                # Generate a blue gradient based on position
+                position = list(topic_data).index((tid, topic_counts[tid]))
+                if position > 0:  # Skip outliers in position calculation
+                    position -= 1 if -1 in topic_counts else 0
+                intensity = 0.5 + (
+                    0.5 * (position / max(1, len(topic_data) - 2))
+                )
+                colors.append(
+                    f"#{int(intensity * 60):02x}{int(intensity * 90):02x}{int(255 * intensity):02x}"
+                )
+
+        # Create horizontal bars
+        bars = ax.barh(topics, counts, color=colors)
+
+        # Add count labels
+        if show_counts:
+            for i, bar in enumerate(bars):
+                width = bar.get_width()
+                ax.text(
+                    width + (max(counts) * 0.01),  # Slight offset
+                    bar.get_y() + bar.get_height() / 2,
+                    f"{int(width)}",
+                    va="center",
+                )
+
+        # Set title and labels
+        ax.set_title("Document Distribution Across Topics")
+        ax.set_xlabel("Number of Documents")
+
+        # Adjust layout
+        plt.tight_layout()
+
         return fig
 
     def visualize_zero_shot_topics(self, figsize=(10, 6), save_path=None):
@@ -339,8 +515,16 @@ if __name__ == "__main__":
     # Load documents
     documents = topic_clustering.load_documents_from_db()
 
-    topics, probs = topic_clustering.basic_topic_modeling(min_topic_size=2)
-    print(f"Found topics: {np.unique(topics)}")
-    df = topic_clustering.get_document_info().head()
-    print(df)
-    topic_clustering.visualize_topics()
+    try:
+        topics, probs = topic_clustering.basic_topic_modeling(min_topic_size=2)
+        print(f"Found topics: {np.unique(topics)}")
+        df = topic_clustering.get_document_info().head()
+        print(df)
+
+        # Try visualizing topics with fallback mechanism
+        fig = topic_clustering.visualize_topics()
+        if fig:
+            plt.show()
+    except Exception as e:
+        print(f"Error in topic modeling: {e}")
+        print("Try using different parameters or a larger document collection")
