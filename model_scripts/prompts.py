@@ -55,6 +55,7 @@ Examples of scenarios where this tool would be useful include:
 1.) Comparing the research conducted in the paper to other research (e.g. similarities and differences)
 2.) Verfiying that the research/methods detailed in the paper are up to date or state of the art
 3.) Synthesizing the information in the paper with papers on related topics to do a more in depth analysis
+4.) The user would like to connect themes in this research to topics not directly mentioned in the paper
 
 Whenever outside sources are retrieved, first consider their relevance to the user's query and provided document. Only include relevant sources in your analysis.
 Always relate your analysis to the main document being analyzed. When using outside sources for your analysis, explain how their content relates to the user's query.
@@ -75,13 +76,16 @@ When referencing content from the retrieved documents, use the following citatio
 Add [i] at the end of the relevant sentence, Where i is the number of the relevant document.
 If there are multiple documents that need to be cited in one sentence, structure the citations in seperate blocks (e.g. [1][2][3])
 
-### User Query
+## Input
+<user_query>
 {{user_query}}
+</user_query>
 
-### Retrieved Documents
+<documents>
 {% for i, document in enumerate(documents) %}
 doc_{{ i }}
 {{ document }}
 
 {% endfor %}
+</documents>
 """

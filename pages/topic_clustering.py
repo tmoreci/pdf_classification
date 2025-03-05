@@ -94,14 +94,14 @@ def show_topic_clustering(initialize_systems):
         with st.spinner("Analyzing topics..."):
             try:
                 if model_type == "Unsupervised":
-                    topics, probs = topic_clustering.basic_topic_modeling(
+                    topics, _ = topic_clustering.basic_topic_modeling(
                         min_topic_size=min_topic_size,
                         nr_topics=nr_topics,
                         verbose=False,
                     )
                     st.session_state.topic_model_type = "unsupervised"
                 else:
-                    topics = topic_clustering.zero_shot_topic_modeling(
+                    topics, _ = topic_clustering.zero_shot_topic_modeling(
                         topic_list=custom_topics,
                         min_similarity=min_similarity,
                         min_topic_size=min_topic_size,
