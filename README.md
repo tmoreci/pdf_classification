@@ -1,11 +1,10 @@
 # Research Paper Q&A Assistant
-
-A powerful tool for researchers to analyze, search, and extract insights from academic papers. This application combines vector search, LLM-powered question answering, and topic clustering to provide an enhanced research experience.
+The main functionality of this tool is for Q&A over an uploaded PDF with a local vector database storing summaries of additional research papers that can be used in analysis. The tool is powered by Gemini-2.0-Flash, which is provided a tool for querying the database for relevant summaries and is prompted to cite these summaries as needed. The retrieval method is a combination of cosine similarity search on the embeddings and BM25 on the actual summaries, inspired by Anthropic's work on contextual document embeddings. I've also added some topic modelling analysis using the BERTopic package, to help get a better sense of what documents you can actually retrieve from your local database.
 
 ## Features
 
-- **Document Q&A**: Upload PDF papers and ask complex questions about their content
-- **Context-Aware Responses**: Get answers based on the paper's content with optional references to related research
+- **Document Q&A**: Upload PDF papers and ask questions about their content
+- **Context-Aware Responses**: Get answers based on the paper's content with optional references to stored summaries of other research papers
 - **Hybrid Search**: Find relevant documents using both semantic and keyword search capabilities
 - **Topic Clustering**: Discover patterns and themes across your research collection
 - **Document Management**: Easily add, index, and organize your research papers
@@ -103,7 +102,7 @@ Then open your browser to http://localhost:8501
 - **Text Embeddings**: Sentence transformers for document vectorization
 - **LLM Integration**: Google Gemini API for question answering
 - **Topic Modeling**: BERTopic for document clustering and theme discovery
-- **PDF Processing**: PyMuPDF for document parsing and extraction
+- **PDF Processing**: PyMuPDF for document parsing and extraction, Gemini for absstract and summary extraction
 
 ### Search Capabilities
 
@@ -113,24 +112,6 @@ The system uses a hybrid search approach that combines:
 - **Keyword Search**: Using BM25 algorithm for traditional search
 - **Weighted Ranking**: Combines both approaches for optimal results
 
-## Requirements
-
-The application requires the following Python packages:
-
-```
-streamlit
-chromadb
-sentence-transformers
-pymupdf
-langchain
-langchain-community
-google-generativeai
-bertopic
-pydantic
-tqdm
-rank_bm25
-jinja2
-```
 ## Acknowledgments
 
 - [Streamlit](https://streamlit.io/) for the interactive web interface
