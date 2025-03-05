@@ -15,10 +15,11 @@ class Summary(BaseModel):
 class LLM(ABC):
     """Abstract base class for LLM interactions"""
 
-    def __init__(self, api_key, database, config_path="llm_config.yaml"):
+    def __init__(self, api_key, database, model, temperature):
         self.api_key = api_key
         self.db = database
-        self.config_path = config_path
+        self.model = model
+        self.temperature = temperature
 
     @abstractmethod
     def generate_answer(self, question, document, temperature=None):

@@ -23,11 +23,9 @@ class CohereLLM(LLM):
     """Handles LLM interactions for Q&A over retrieved documents"""
 
     def __init__(self, api_key, database, model, temperature):
+        super().__init__(api_key, database, model, temperature)
         # Initialize LLM client
         self.llm = cohere.ClientV2(api_key)
-        self.db = database
-        self.model = self.model
-        self.temperature = self.temperature
         self.tools = [
             cohere.ToolV2(
                 type="function",
@@ -121,11 +119,9 @@ class GeminiLLM(LLM):
     """Handles LLM interactions for Q&A over retrieved documents"""
 
     def __init__(self, api_key, database, model, temperature):
+        super().__init__(api_key, database, model, temperature)
         # Initialize LLM client
         self.llm = genai.Client(api_key=api_key)
-        self.db = database
-        self.model = model
-        self.temperature = temperature
         self.tool = types.Tool(
             function_declarations=[
                 types.FunctionDeclaration(
