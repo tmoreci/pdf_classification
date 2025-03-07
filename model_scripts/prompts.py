@@ -89,3 +89,35 @@ doc_{{ i }}
 {% endfor %}
 </documents>
 """
+gemini_retrieved_prompt_thinking = """
+## Task
+You have been provided a PDF of an academic research paper. You will now be provided with a user query about the paper and a set of small summaries of additional research papers that are relevant to the user's query.
+Answer the user's query to the best of your ability, citing relevant retrieved documents when necessary. There is a chance some or all of the retrieved documents are not relevant to the query. Only include information from relevant documents in your analysis.
+First think about which retrieved documents are relevant and how they relate to the query and provided document. Then compose a helpful response based on this analysis.
+## Output Instructions
+Please structure your output using the following format:
+
+<thinking>
+Your thoughts about the relevance of retrieved summaries goes here
+</thinking/>
+<response>
+Your well structured response for the user goes here
+</response>
+
+When referencing content from the retrieved documents, use the following citation format:
+Add [i] at the end of the relevant sentence, Where i is the number of the relevant document.
+If there are multiple documents that need to be cited in one sentence, structure the citations in seperate blocks (e.g. [1][2][3])
+
+## Input
+<user_query>
+{{user_query}}
+</user_query>
+
+<documents>
+{% for i, document in enumerate(documents) %}
+doc_{{ i }}
+{{ document }}
+
+{% endfor %}
+</documents>
+"""
