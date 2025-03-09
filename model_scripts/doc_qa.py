@@ -4,7 +4,7 @@ from prompts import (
     tool_description,
     user_message,
     gemini_prompt,
-    gemini_retrieved_prompt,
+    gemini_retrieved_prompt_thinking,
 )
 from db import DocumentDatabase
 from jinja2 import Template
@@ -15,6 +15,8 @@ from google.genai import types
 from pathlib import Path
 from base import LLM
 from typing import Dict, List, Any, Optional, Tuple
+from dotenv import load_dotenv
+import os
 
 
 class CohereLLM(LLM):
@@ -227,6 +229,27 @@ class GeminiLLM(LLM):
         tool_result = self.db.hybrid_search(query)
         return tool_result
 
+    def _parse_thinking(self, llm_output: str) -> str:
+        """
+        Parses the LLM response to extract only the content within the <response> tags
+
+        Args:
+            llm_output (str): The full output from the LLM
+
+        Returns:
+            str: The extracted response content or None if no response tags found
+        """
+        # Handle case where input is None or empty
+        if not llm_output:
+            return None
+
+        # Use regex to extract content between <response> and </response> tags
+        response_regex = r"<response>([\s\S]*?)</response>"
+        match = re.search(response_regex, llm_output)
+
+        # Return the captured group (content between tags) or None if no match
+        return match.group(1).strip() if match else llm_output
+
     def generate_answer(
         self, question: str, document: str, temperature: Optional[float] = None
     ) -> Tuple[Any, List[int], Dict[str, Any]]:
@@ -262,7 +285,7 @@ class GeminiLLM(LLM):
         )
         if response.function_calls:
             retrieved_docs = self._handle_tool_call(response.function_calls)
-            retrieval_template = Template(gemini_retrieved_prompt)
+            retrieval_template = Template(gemini_retrieved_prompt_thinking)
             # ! To Do: Add titles to prompt
             user_input = retrieval_template.render(
                 user_query=question,
@@ -280,9 +303,10 @@ class GeminiLLM(LLM):
                 ],
                 config=self.model_config,
             )
-            cited_docs = self._extract_citations(response.text)
+            parsed_response = self._parse_thinking(response.text)
+            cited_docs = self._extract_citations(parsed_response)
 
-        return response, cited_docs, retrieved_docs
+        return parsed_response, cited_docs, retrieved_docs
 
 
 # Example usage
@@ -295,7 +319,7 @@ if __name__ == "__main__":
     doc_path = "../data/2408.02545v1.pdf"
     model = "gemini-2.0-flash"
     temperature = 0.1
-    document = full_text_parse(doc_path)
+    # document = full_text_parse(doc_path)
     query = "How could this research be combined with other research to enhance multi-agent systems?"
     # Initialize QA system
     # model = CohereLLM(cohere_api_key, database)
@@ -303,4 +327,4 @@ if __name__ == "__main__":
     model_response, cited_docs, retrieved_docs = model.generate_answer(
         query, doc_path
     )
-    print(model_response.text)
+    print(model_response)

@@ -17,7 +17,7 @@ class DocumentDatabase:
         gemini_api: str,
         db_path: str = "../data/chroma_db",
         collection_name: str = "academic_papers",
-        model_name: str = "BAAI/bge-base-en-v1.5",
+        model_name: str = "all-MiniLM-L6-v2",
     ):
         """
         Initialize the document database with embedding functions and ChromaDB client.

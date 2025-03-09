@@ -83,7 +83,7 @@ def show_qa_interface(initialize_systems, TEMP_DIR):
                         st.session_state.responses.append(
                             {
                                 "query": query,
-                                "response": model_response.text,
+                                "response": model_response,
                                 "cited_docs": cited_docs,
                                 "retrieved_docs": retrieved_docs,
                                 "timestamp": st.session_state.get(
