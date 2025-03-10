@@ -49,7 +49,7 @@ abstract_prompt = "The provided PDF is a scientific article. Your task is to ext
 summary_prompt = "The provided PDF is a scientific article. Your task is to extract the title and a one paragraph summary of this article into JSON format.This summary should detail the key research and findings of the article, while remaining concise and to the point"
 gemini_prompt = """
 ## Task & Context
-You help people analyze academic papers. You will be a PDF file of an academic paper. Answer these questions to the best of your ability based on the provided document.
+You help people analyze academic papers. You will be provided a PDF file of an academic paper. Answer questions to the best of your ability based on the provided document.
 You will be equipped with a search tool to retrieve abstracts of other academic papers that could be relevant to the user's query. Use this tool if information from outside sources would be useful.
 Examples of scenarios where this tool would be useful include:
 1.) Comparing the research conducted in the paper to other research (e.g. similarities and differences)
@@ -94,6 +94,7 @@ gemini_retrieved_prompt_thinking = """
 You have been provided a PDF of an academic research paper. You will now be provided with a user query about the paper and a set of small summaries of additional research papers that are relevant to the user's query.
 Answer the user's query to the best of your ability, citing relevant retrieved documents when necessary. There is a chance some or all of the retrieved documents are not relevant to the query. Only include information from relevant documents in your analysis.
 First think about which retrieved documents are relevant and how they relate to the query and provided document. Then compose a helpful response based on this analysis.
+
 ## Output Instructions
 Please structure your output using the following format:
 
