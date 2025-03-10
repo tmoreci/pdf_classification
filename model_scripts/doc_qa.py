@@ -305,6 +305,8 @@ class GeminiLLM(LLM):
             )
             parsed_response = self._parse_thinking(response.text)
             cited_docs = self._extract_citations(parsed_response)
+        else:
+            parsed_response = response.text
 
         return parsed_response, cited_docs, retrieved_docs
 
