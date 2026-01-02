@@ -1,6 +1,8 @@
 # Research Paper Q&A Assistant
 The main functionality of this tool is for Q&A over an uploaded PDF with a local vector database storing summaries of additional research papers that can be used in analysis. The tool is powered by Gemini-2.0-Flash, which is provided a tool for querying the database for relevant summaries and is prompted to cite these summaries as needed. The retrieval method is a combination of cosine similarity search on the embeddings and BM25 on the actual summaries, inspired by Anthropic's work on contextual document embeddings. I've also added some topic modelling analysis using the BERTopic package to help get a better sense of what documents you can actually retrieve from your local database.
 
+**NEW**: The application now includes a comprehensive **FastAPI REST API** for easy integration with any frontend framework!
+
 ## Features
 
 - **Document Q&A**: Upload PDF papers and ask questions about their content
@@ -8,15 +10,19 @@ The main functionality of this tool is for Q&A over an uploaded PDF with a local
 - **Hybrid Search**: Find relevant documents using both semantic and keyword search capabilities
 - **Topic Clustering**: Discover patterns and themes across your research collection
 - **Document Management**: Easily add, index, and organize your research papers
+- **RESTful API**: FastAPI-based endpoints for integration with modern frontends (React, Vue, Angular, etc.)
 
 ## System Architecture
 
-The application is built with a modular architecture:
+The application is built with a modular architecture supporting both Streamlit UI and FastAPI:
 
 ```
 ├── app.py                  # Main Streamlit application entry point
-├── run.py                  # Script to initialize and run the application
-├── model_scripts/          # Core functionality modules
+├── run.py                  # Script to initialize and run Streamlit app
+├── api.py                  # FastAPI application with REST endpoints
+├── api_schemas.py          # Pydantic models for API requests/responses
+├── run_api.py              # Script to run the FastAPI server
+├── model_scripts/          # Core functionality modules (shared between UI and API)
 │   ├── base.py             # Abstract base classes and data models
 │   ├── db.py               # Document database and vector store operations
 │   ├── doc_qa.py           # LLM-based question answering
@@ -59,7 +65,11 @@ The application is built with a modular architecture:
 
 ### Running the Application
 
-Run the application using the provided script:
+You can run either the Streamlit UI or the FastAPI server (or both simultaneously on different ports).
+
+#### Option 1: Streamlit UI (Web Interface)
+
+Run the Streamlit application using the provided script:
 
 ```bash
 python run.py
@@ -72,6 +82,27 @@ streamlit run app.py
 ```
 
 Then open your browser to http://localhost:8501
+
+#### Option 2: FastAPI Server (REST API)
+
+Run the FastAPI server for programmatic access:
+
+```bash
+python run_api.py
+```
+
+Or directly with uvicorn:
+
+```bash
+uvicorn api:app --reload --host 0.0.0.0 --port 8000
+```
+
+Then access:
+- Interactive API docs (Swagger): http://localhost:8000/docs
+- Alternative docs (ReDoc): http://localhost:8000/redoc
+- API endpoints: http://localhost:8000/
+
+See [API_GUIDE.md](API_GUIDE.md) for complete API documentation and usage examples.
 
 ## Usage Guide
 
